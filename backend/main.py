@@ -11,6 +11,15 @@ from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+app = FastAPI(title="SoundSense API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # ─────────────────────────────────────────────
 # Logging & Environment
 # ─────────────────────────────────────────────
@@ -99,15 +108,13 @@ else:
 
 
 # ─────────────────────────────────────────────
-# Globals populated at startup
+# Model Initialization
 # ─────────────────────────────────────────────
 model: Optional[FastSpeakerEmbeddingNet] = None
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+def load_local_model():
     global model
-    if HAS_ML_LIBS:
+    if HAS_ML_LIBS and MODEL_PATH.exists():
         log.info("Loading model from %s …", MODEL_PATH)
         try:
             m = FastSpeakerEmbeddingNet(embedding_dim=EMBEDDING_DIM)
@@ -117,19 +124,15 @@ async def lifespan(app: FastAPI):
             model = m
             log.info("Model loaded ✓")
         except Exception as exc:
-            log.warning("Could not load saved weights (%s). Using random init.", exc)
-            model = FastSpeakerEmbeddingNet(embedding_dim=EMBEDDING_DIM)
-            model.eval()
-    else:
-        log.info("Skipping model load (ML libs missing).")
-    yield
-    log.info("Shutdown.")
+            log.warning("Could not load saved weights (%s).", exc)
+
+if not os.environ.get("VERCEL"):
+    load_local_model()
 
 
 # ─────────────────────────────────────────────
-# App
+# Routes
 # ─────────────────────────────────────────────
-app = FastAPI(title="SoundSense API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
