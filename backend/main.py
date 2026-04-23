@@ -413,7 +413,12 @@ def cleanup_file(path: Path):
 # ─────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "model_loaded": model is not None}
+    key = os.getenv("GEMINI_API_KEY")
+    return {
+        "status": "ok", 
+        "gemini_key_detected": key is not None and len(key) > 0,
+        "ml_libs_available": HAS_ML_LIBS
+    }
 
 
 @app.post("/analyze", response_model=AnalysisResult)
