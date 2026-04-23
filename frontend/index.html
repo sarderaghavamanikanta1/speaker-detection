@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SoundSense v1.0</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap"
+        rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #04080f;
+            --surface: rgba(20, 27, 39, 0.7);
+            --card: rgba(26, 36, 54, 0.6);
+            --border: rgba(255, 255, 255, 0.08);
+            --accent: #00ffc3;
+            --accent2: #0077ff;
+            --muted: #6272a4;
+            --text: #f8f8f2;
+            --text2: #9eabbd;
+            --font-mono: 'Space Mono', monospace;
+            --font-body: 'DM Sans', sans-serif;
+            --r: 24px;
+            --shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 60px 20px 80px;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 102, 255, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(0, 229, 176, 0.1) 0%, transparent 40%);
+        }
+
+        /* ── Animated Background ── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 102, 255, 0.05) 0%, transparent 50%);
+            animation: rotate 30s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── Status Indicator ── */
+        .status-bar {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface);
+            padding: 8px 16px;
+            border-radius: 40px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            z-index: 100;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff5555;
+            box-shadow: 0 0 10px #ff5555;
+        }
+        .status-dot.online {
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ── Logo row ── */
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 56px;
+            opacity: 0;
+            animation: fadeInDown 0.8s forwards;
+        }
+
+        .logo {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 20px rgba(0, 229, 176, 0.2);
+        }
+
+        .logo svg {
+            width: 28px;
+            height: 28px;
+            fill: none;
+            stroke: #fff;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .brand-name {
+            font-family: var(--font-mono);
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+        }
+
+        /* ── Heading ── */
+        h1 {
+            font-size: clamp(36px, 6vw, 64px);
+            font-weight: 700;
+            line-height: 1.1;
+            text-align: center;
+            margin-bottom: 24px;
+            background: linear-gradient(to bottom, #fff 40%, #888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h1 em {
+            color: var(--accent);
+            font-style: normal;
+            -webkit-text-fill-color: var(--accent);
+        }
+
+        .subtitle {
+            color: var(--text2);
+            font-size: 17px;
+            max-width: 520px;
+            line-height: 1.8;
+            margin-bottom: 56px;
+            text-align: center;
+        }
+
+        /* ── Card shell ── */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            width: 100%;
+            max-width: 600px;
+            overflow: hidden;
+            backdrop-filter: blur(20px);
+            box-shadow: var(--shadow);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255,255,255,0.15);
+        }
+
+        /* ── Drop zone ── */
+        #dropzone {
+            padding: 80px 40px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px dashed var(--border);
+            margin: 20px;
+            border-radius: var(--r);
+            transition: all 0.3s ease;
+            position: relative;
+            background: rgba(255,255,255, 0.02);
+        }
+
+        #dropzone.drag {
+            border-color: var(--accent);
+            background: rgba(0, 229, 176, 0.08);
+            transform: scale(0.98);
+        }
+
+        #dropzone input[type=file] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            transition: inherit;
+        }
+
+        .upload-icon svg {
+            width: 32px;
+            height: 32px;
+            stroke: var(--accent);
+            fill: none;
+            stroke-width: 2;
+        }
+
+        #dropzone:hover .upload-icon {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 229, 176, 0.15);
+            border-color: var(--accent);
+        }
+
+        .drop-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .drop-hint {
+            font-size: 14px;
+            color: var(--text2);
+        }
+
+        .drop-hint span {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* ── Analyse button ── */
+        #analyse-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: calc(100% - 40px);
+            margin: 0 20px 20px;
+            padding: 20px;
+            border: none;
+            border-radius: 16px;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #000;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            letter-spacing: 0.15em;
+            transition: all 0.3s ease;
+            font-weight: 800;
+            box-shadow: 0 10px 20px rgba(0, 229, 176, 0.3);
+        }
+
+        #analyse-btn:hover:not(:disabled) {
+            transform: scale(1.02);
+            box-shadow: 0 15px 30px rgba(0, 229, 176, 0.4);
+            filter: brightness(1.1);
+        }
+
+        #analyse-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        #analyse-btn:disabled {
+            background: var(--surface);
+            color: var(--muted);
+            box-shadow: none;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        /* ── Loading state ── */
+        #loading {
+            display: none;
+            padding: 60px 40px;
+            text-align: center;
+        }
+
+        .spinner-outer {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 32px;
+            position: relative;
+        }
+
+        .spinner {
+            width: 100%;
+            height: 100%;
+            border: 3px solid transparent;
+            border-top-color: var(--accent);
+            border-bottom-color: var(--accent2);
+            border-radius: 50%;
+            animation: spin 1s cubic-bezier(0.53, 0.21, 0.29, 0.67) infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-label {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--accent);
+            letter-spacing: 0.1em;
+            font-weight: 600;
+        }
+
+        /* ── Results ── */
+        #results {
+            display: none;
+            padding: 32px;
+            animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 32px;
+        }
+
+        .result-title {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--accent);
+            letter-spacing: 0.2em;
+            font-weight: 700;
+        }
+
+        .badge {
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(0, 255, 195, 0.1);
+            color: var(--accent);
+            border: 1px solid rgba(0, 255, 195, 0.2);
+            text-transform: uppercase;
+        }
+
+        /* Stat row */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat {
+            background: rgba(255,255,255, 0.03);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            transition: background 0.3s;
+        }
+
+        .stat:hover {
+            background: rgba(255,255,255, 0.06);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: var(--font-mono);
+            letter-spacing: 0.1em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .stat-unit {
+            font-size: 14px;
+            color: var(--text2);
+            margin-left: 4px;
+            font-weight: 500;
+        }
+
+        /* Segments timeline */
+        .timeline-label {
+            font-size: 12px;
+            color: var(--text2);
+            font-family: var(--font-mono);
+            letter-spacing: 0.1em;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .segments {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 32px;
+        }
+
+        .seg {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 14px 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.02);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .seg-speaker {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--c);
+            min-width: 100px;
+        }
+
+        .seg-bar-wrap {
+            flex: 1;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .seg-bar {
+            height: 100%;
+            border-radius: 10px;
+            background: var(--c);
+            box-shadow: 0 0 10px var(--c);
+        }
+
+        .seg-time {
+            font-size: 12px;
+            color: var(--text2);
+            font-family: var(--font-mono);
+            min-width: 90px;
+            text-align: right;
+        }
+
+        .reset-btn {
+            display: block;
+            width: 100%;
+            padding: 20px;
+            border: none;
+            border-top: 1px solid var(--border);
+            background: transparent;
+            color: var(--text2);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .reset-btn:hover {
+            background: rgba(255,255,255, 0.05);
+            color: #fff;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* speaker colors */
+        :root {
+            --sp1: #00ffca;
+            --sp2: #3a86ff;
+            --sp3: #ff006e;
+            --sp4: #ffbe0b;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="status-bar">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">OFFLINE</span>
+    </div>
+
+    <div class="brand">
+        <div class="logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+                <path d="M3 12h3M9 8v8M15 4v16M21 12h-3" stroke-linecap="round" />
+            </svg>
+        </div>
+        <span class="brand-name">SOUNDSENSE v1.0</span>
+    </div>
+
+    <h1>AI <em>Classification</em><br>& Diarization</h1>
+    <p class="subtitle">Upload a WAV file to identify speakers and classify speech type using deep neural networks.</p>
+
+    <div class="card">
+        <!-- Upload state -->
+        <div id="upload-state">
+            <div id="dropzone" ondragover="onDrag(event,true)" ondragleave="onDrag(event,false)" ondrop="onDrop(event)">
+                <input type="file" accept=".wav" onchange="onFileSelect(event)" id="file-input" />
+                <div class="upload-icon">
+                    <svg viewBox="0 0 24 24">
+                        <polyline points="16 16 12 12 8 16" />
+                        <line x1="12" y1="12" x2="12" y2="21" />
+                        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+                    </svg>
+                </div>
+                <p class="drop-title" id="drop-label">Drop your WAV file here</p>
+                <p class="drop-hint">or <span>click to browse</span> — .wav only · mono · 16kHz</p>
+            </div>
+
+            <!-- Speaker Selection Removed for Full Autonomy -->
+            <button id="analyse-btn" disabled onclick="analyse()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                ANALYSE AUDIO
+            </button>
+        </div>
+
+        <!-- Loading state -->
+        <div id="loading">
+            <div class="spinner-outer">
+                <div class="spinner"></div>
+            </div>
+            <p class="loading-label" id="loading-msg">PROCESSING AUDIO…</p>
+        </div>
+
+        <!-- Results state -->
+        <div id="results">
+            <div class="result-header">
+                <span class="result-title">ANALYSIS COMPLETE</span>
+                <span class="badge" id="speech-type-badge">—</span>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-label">SPEAKERS</div>
+                    <div class="stat-value" id="r-speakers">—</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">DURATION</div>
+                    <div class="stat-value" id="r-duration">—<span class="stat-unit">s</span></div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">CONFIDENCE</div>
+                    <div class="stat-value" id="r-conf">—<span class="stat-unit">%</span></div>
+                </div>
+            </div>
+            <div class="timeline-label">Speaker Profiles</div>
+            <div id="speaker-profiles" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 32px;"></div>
+
+            <div class="timeline-label">Conversation Timeline</div>
+            <div class="segments" id="segments-list"></div>
+        </div>
+
+        <button class="reset-btn" id="reset-btn" onclick="reset()" style="display:none">↩ Analyse another file</button>
+    </div>
+
+    <script>
+        const API = 'http://127.0.0.1:8000';
+        const COLORS = ['var(--sp1)', 'var(--sp2)', 'var(--sp3)', 'var(--sp4)'];
+
+        function formatMMSS(sec, showDecimal = true) {
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            if (!showDecimal) return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            const ms = Math.floor((sec % 1) * 10);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms}`;
+        }
+        let selectedFile = null;
+
+        // Health check
+        async function checkHealth() {
+            try {
+                const res = await fetch(`${API}/health`);
+                if (res.ok) {
+                    document.getElementById('status-dot').classList.add('online');
+                    document.getElementById('status-text').textContent = 'ONLINE';
+                } else {
+                    throw new Error();
+                }
+            } catch (e) {
+                document.getElementById('status-dot').classList.remove('online');
+                document.getElementById('status-text').textContent = 'OFFLINE';
+            }
+        }
+        setInterval(checkHealth, 5000);
+        checkHealth();
+
+        function onDrag(e, active) {
+            e.preventDefault();
+            document.getElementById('dropzone').classList.toggle('drag', active);
+        }
+        function onDrop(e) {
+            e.preventDefault();
+            onDrag(e, false);
+            const f = e.dataTransfer.files[0];
+            if (f) setFile(f);
+        }
+        function onFileSelect(e) {
+            const f = e.target.files[0];
+            if (f) setFile(f);
+        }
+        function setFile(f) {
+            if (!f.name.endsWith('.wav')) { alert('Please upload a .wav file.'); return; }
+            selectedFile = f;
+            document.getElementById('drop-label').textContent = f.name;
+            document.getElementById('analyse-btn').disabled = false;
+        }
+
+        const loadingMsgs = [
+            'OPTIMIZING AUDIO…', 'EXTRACTING SPECTROGRAMS…', 'NEURAL CLASSIFICATION…', 'SPEAKER DIARIZATION…', 'POLISHING RESULTS…'
+        ];
+        let msgIdx = 0, msgTimer;
+
+        function showLoading() {
+            document.getElementById('upload-state').style.display = 'none';
+            // Keep results visible but dimmed during fresh analysis
+            document.getElementById('results').style.opacity = '0.3';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('reset-btn').style.display = 'none';
+            msgIdx = 0;
+            document.getElementById('loading-msg').textContent = loadingMsgs[0];
+            msgTimer = setInterval(() => {
+                msgIdx = (msgIdx + 1) % loadingMsgs.length;
+                document.getElementById('loading-msg').textContent = loadingMsgs[msgIdx];
+            }, 1200);
+        }
+
+        function hideLoading() {
+            clearInterval(msgTimer);
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showResults(data) {
+            document.getElementById('r-speakers').textContent = data.num_speakers;
+            document.getElementById('r-duration').innerHTML = `${formatMMSS(data.duration_seconds, false)}`;
+            document.getElementById('r-conf').innerHTML = `${Math.round(data.confidence * 100)}<span class="stat-unit">%</span>`;
+            document.getElementById('speech-type-badge').textContent = data.speech_type.replace(/_/g, ' ');
+
+            const totalDur = data.duration_seconds;
+            const list = document.getElementById('segments-list');
+            const profiles = document.getElementById('speaker-profiles');
+            list.innerHTML = '';
+            profiles.innerHTML = '';
+
+            const speakerMap = {};
+            const speakerStats = {}; // Total duration per speaker
+            let colorIdx = 0;
+
+            // First pass: Calculate totals and colors
+            data.segments.forEach(seg => {
+                if (!speakerMap[seg.speaker]) {
+                    speakerMap[seg.speaker] = COLORS[colorIdx++ % COLORS.length];
+                    speakerStats[seg.speaker] = 0;
+                }
+                speakerStats[seg.speaker] += seg.duration;
+            });
+
+            // Populate Profiles
+            Object.keys(speakerStats).forEach(spk => {
+                const c = speakerMap[spk];
+                const time = speakerStats[spk].toFixed(1);
+                profiles.innerHTML += `
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid ${c}; border-left-width: 6px; padding: 12px; border-radius: 12px;">
+                        <div style="font-family: var(--font-mono); font-size: 10px; color: ${c}; margin-bottom: 4px;">TAG</div>
+                        <div style="font-weight: 700; margin-bottom: 2px;">${spk}</div>
+                        <div style="font-size: 12px; color: var(--text2);">${time}s total</div>
+                    </div>`;
+            });
+
+            // Populate Timeline
+            data.segments.forEach(seg => {
+                const c = speakerMap[seg.speaker];
+                const pct = Math.min(100, (seg.duration / totalDur) * 100).toFixed(1);
+                list.innerHTML += `
+                    <div class="seg" style="--c:${c}; border-left: 4px solid ${c}">
+                        <span class="seg-speaker">${seg.speaker}</span>
+                        <div class="seg-bar-wrap"><div class="seg-bar" style="width:${pct}%;background:${c}"></div></div>
+                        <span class="seg-time">${formatMMSS(seg.start)} – ${formatMMSS(seg.end)}</span>
+                    </div>`;
+            });
+
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('results').style.opacity = '1';
+            document.getElementById('reset-btn').style.display = 'block';
+        }
+
+        async function analyse() {
+            if (!selectedFile) return;
+            showLoading();
+            try {
+                const numSpeakers = 0; // Always Auto-Detect
+                const fd = new FormData();
+                fd.append('file', selectedFile);
+                const res = await fetch(`${API}/analyze?num_speakers=${numSpeakers}`, { method: 'POST', body: fd });
+                hideLoading();
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    alert('Error: ' + (err.detail || res.statusText));
+                    reset(); return;
+                }
+                const data = await res.json();
+                showResults(data);
+            } catch (e) {
+                hideLoading();
+                alert('Backend unavailable. Is SoundSense API running at ' + API + '?');
+                reset();
+            }
+        }
+
+        function reset() {
+            selectedFile = null;
+            document.getElementById('drop-label').textContent = 'Drop your WAV file here';
+            document.getElementById('analyse-btn').disabled = true;
+            document.getElementById('file-input').value = '';
+            document.getElementById('upload-state').style.display = 'block';
+            // Results remain visible but dimmed until another analysis is triggered
+            document.getElementById('results').style.opacity = '0.5';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('reset-btn').style.display = 'none';
+        }
+    </script>
+</body>
+
+</html>

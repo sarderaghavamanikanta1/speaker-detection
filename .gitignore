@@ -1,0 +1,21 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Project specific
+backend/uploads/
+backend/outputs/
+uploads/
+*.wav
+
+# IDEs
+.vscode/
+.idea/
