@@ -6,6 +6,7 @@ FastAPI + PyTorch CNN + pyannote-style diarization
 import os, uuid, logging
 from pathlib import Path
 from contextlib import asynccontextmanager
+import numpy as np
 
 try:
     import torch
