@@ -1,13 +1,28 @@
-"""
-SoundSense v1.0 — Speaker Classification & Diarization Backend
-FastAPI + PyTorch CNN + pyannote-style diarization
-"""
-
-import os, uuid, logging
+import os, uuid, logging, json, wave
 from pathlib import Path
 from contextlib import asynccontextmanager
-import numpy as np
+from typing import List, Optional
 
+import numpy as np
+from dotenv import load_dotenv
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+# ─────────────────────────────────────────────
+# Logging & Environment
+# ─────────────────────────────────────────────
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("soundsense")
+
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# ─────────────────────────────────────────────
+# Optional ML Libraries
+# ─────────────────────────────────────────────
 try:
     import torch
     import torch.nn as nn
@@ -18,39 +33,20 @@ try:
     HAS_ML_LIBS = True
 except ImportError:
     HAS_ML_LIBS = False
-    log.warning("Heavy ML libraries not found. Local model disabled (using Gemini only).")
-
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from typing import List, Optional
-import google.generativeai as genai
-from dotenv import load_dotenv
-import json
+    log.warning("Heavy ML libraries not found. Local model disabled.")
 
 # ─────────────────────────────────────────────
-# Logging & Globals
+# Optional Gemini AI
 # ─────────────────────────────────────────────
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("soundsense")
+try:
+    import google.generativeai as genai
+    if GEMINI_API_KEY:
+        genai.configure(api_key=GEMINI_API_KEY)
+        log.info("Gemini AI integration enabled ✓")
+except ImportError:
+    log.warning("google-generativeai not installed.")
 
-load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    log.info("Gemini AI integration enabled ✓")
-else:
-    log.warning("GEMINI_API_KEY not found in .env. Falling back to local model only.")
-
-# Vercel compatibility: use /tmp for writes in serverless
-if os.environ.get("VERCEL"):
-    UPLOAD_DIR = Path("/tmp") / "uploads"
-else:
-    UPLOAD_DIR = Path("uploads")
-
+UPLOAD_DIR = Path("/tmp") if os.environ.get("VERCEL") else Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
 
 MODEL_PATH   = Path(__file__).parent / "model" / "model.pth"
