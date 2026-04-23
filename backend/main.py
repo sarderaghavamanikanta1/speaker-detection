@@ -40,8 +40,13 @@ if GEMINI_API_KEY:
 else:
     log.warning("GEMINI_API_KEY not found in .env. Falling back to local model only.")
 
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+# Vercel compatibility: use /tmp for writes in serverless
+if os.environ.get("VERCEL"):
+    UPLOAD_DIR = Path("/tmp") / "uploads"
+else:
+    UPLOAD_DIR = Path("uploads")
+
+UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
 
 MODEL_PATH   = Path(__file__).parent / "model" / "model.pth"
 SAMPLE_RATE  = 16_000
