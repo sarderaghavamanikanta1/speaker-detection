@@ -7,13 +7,17 @@ import os, uuid, logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import librosa
-from sklearn.cluster import AgglomerativeClustering
-from sklearn.metrics import silhouette_score
+try:
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    import librosa
+    from sklearn.cluster import AgglomerativeClustering
+    from sklearn.metrics import silhouette_score
+    HAS_ML_LIBS = True
+except ImportError:
+    HAS_ML_LIBS = False
+    log.warning("Heavy ML libraries not found. Local model disabled (using Gemini only).")
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,28 +71,34 @@ MAX_DURATION_SEC = 300
 #   fc.1        Linear(256 → 64)
 #   Output      L2-normalized embedding  (NOT a classifier)
 # ─────────────────────────────────────────────
-class FastSpeakerEmbeddingNet(nn.Module):                  # ← fixed: correct class name & architecture
-    def __init__(self, embedding_dim: int = EMBEDDING_DIM):
-        super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(1, 8, kernel_size=3, padding=1),     # features.0
-            nn.ReLU(),                                      # features.1
-            nn.MaxPool2d(2),                                # features.2
-            nn.Conv2d(8, 16, kernel_size=3, padding=1),    # features.3
-            nn.ReLU(),                                      # features.4
-            nn.AdaptiveAvgPool2d((4, 4)),                   # features.5  ← fixed: was MaxPool2d
-        )
-        self.fc = nn.Sequential(
-            nn.Flatten(),                                   # fc.0
-            nn.Linear(16 * 4 * 4, embedding_dim),          # fc.1  ← fixed: 256→64, no extra layers
-        )
+if HAS_ML_LIBS:
+    class FastSpeakerEmbeddingNet(nn.Module):                  # ← fixed: correct class name & architecture
+        def __init__(self, embedding_dim: int = EMBEDDING_DIM):
+            super().__init__()
+            self.features = nn.Sequential(
+                nn.Conv2d(1, 8, kernel_size=3, padding=1),     # features.0
+                nn.ReLU(),                                      # features.1
+                nn.MaxPool2d(2),                                # features.2
+                nn.Conv2d(8, 16, kernel_size=3, padding=1),    # features.3
+                nn.ReLU(),                                      # features.4
+                nn.AdaptiveAvgPool2d((4, 4)),                   # features.5  ← fixed: was MaxPool2d
+            )
+            self.fc = nn.Sequential(
+                nn.Flatten(),                                   # fc.0
+                nn.Linear(16 * 4 * 4, embedding_dim),          # fc.1  ← fixed: 256→64, no extra layers
+            )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x.unsqueeze(1)                                 # (B, 1, mel, time)
-        x = self.features(x)
-        x = self.fc(x)
-        x = F.normalize(x, p=2, dim=1)                    # ← fixed: L2 norm, not softmax
-        return x
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            x = x.unsqueeze(1)                                 # (B, 1, mel, time)
+            x = self.features(x)
+            x = self.fc(x)
+            x = F.normalize(x, p=2, dim=1)                    # ← fixed: L2 norm, not softmax
+            return x
+else:
+    class FastSpeakerEmbeddingNet:
+        def __init__(self, *args, **kwargs): pass
+        def eval(self): pass
+        def __call__(self, *args, **kwargs): return None
 
 
 # ─────────────────────────────────────────────
@@ -100,20 +110,21 @@ model: Optional[FastSpeakerEmbeddingNet] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global model
-    log.info("Loading model from %s …", MODEL_PATH)
-    try:
-        m = FastSpeakerEmbeddingNet(embedding_dim=EMBEDDING_DIM)
-        # ← fixed: load from data.pkl, weights_only=False for compatibility
-        state = torch.load(MODEL_PATH, map_location="cpu", weights_only=False)
-        m.load_state_dict(state)
-        m.eval()
-        model = m
-        log.info("Model loaded ✓")
-    except Exception as exc:
-        log.warning("Could not load saved weights (%s). Using random init.", exc)
-        # Still allow the server to run — embeddings will be random but pipeline works
-        model = FastSpeakerEmbeddingNet(embedding_dim=EMBEDDING_DIM)
-        model.eval()
+    if HAS_ML_LIBS:
+        log.info("Loading model from %s …", MODEL_PATH)
+        try:
+            m = FastSpeakerEmbeddingNet(embedding_dim=EMBEDDING_DIM)
+            state = torch.load(MODEL_PATH, map_location="cpu", weights_only=False)
+            m.load_state_dict(state)
+            m.eval()
+            model = m
+            log.info("Model loaded ✓")
+        except Exception as exc:
+            log.warning("Could not load saved weights (%s). Using random init.", exc)
+            model = FastSpeakerEmbeddingNet(embedding_dim=EMBEDDING_DIM)
+            model.eval()
+    else:
+        log.info("Skipping model load (ML libs missing).")
     yield
     log.info("Shutdown.")
 
@@ -169,10 +180,21 @@ class AnalysisResult(BaseModel):
 
 
 # ─────────────────────────────────────────────
-# Audio helpers
+# Audio helpers (Lightweight fallback)
 # ─────────────────────────────────────────────
+import wave
+
+def get_audio_duration(path: Path) -> float:
+    """Get duration of a WAV file without librosa."""
+    with wave.open(str(path), 'rb') as f:
+        frames = f.getnframes()
+        rate = f.getframerate()
+        return frames / float(rate)
+
 def load_audio(path: Path) -> tuple[np.ndarray, int]:
     """Load WAV, force mono, resample to SAMPLE_RATE."""
+    if not HAS_ML_LIBS:
+        raise ImportError("librosa not installed. Local audio loading disabled.")
     y, sr = librosa.load(str(path), sr=SAMPLE_RATE, mono=True)
     return y, sr
 
@@ -411,11 +433,14 @@ async def analyze(
 
     # ── Process ───────────────────────────────────────────
     try:
-        y, sr = load_audio(save_path)
+        if HAS_ML_LIBS:
+            y, sr = load_audio(save_path)
+            duration = len(y) / sr
+        else:
+            duration = get_audio_duration(save_path)
     except Exception as exc:
         raise HTTPException(422, f"Could not decode audio: {exc}")
 
-    duration = len(y) / sr
     if duration > MAX_DURATION_SEC:
         raise HTTPException(400, f"Audio too long ({duration:.0f}s). Max {MAX_DURATION_SEC}s.")
 
@@ -426,7 +451,10 @@ async def analyze(
         segments = gemini_segments
         method = "Gemini 1.5 AI"
     else:
-        # 2. Fallback to Local Model
+        # 2. Fallback to Local Model (Only if libs available)
+        if not HAS_ML_LIBS:
+             raise HTTPException(400, "Gemini API key missing and local ML libraries not available on this server.")
+        
         segments = diarize(y, sr, num_speakers=num_speakers)
         method = "Local CNN"
 
