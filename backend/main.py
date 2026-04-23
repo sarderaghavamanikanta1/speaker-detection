@@ -338,11 +338,16 @@ def diarize(y: np.ndarray, sr: int, num_speakers: int = 2) -> list[dict]:
 
 async def analyze_with_gemini(audio_path: Path) -> Optional[List[dict]]:
     """Use Gemini 1.5 Flash to perform high-precision diarization."""
-    if not GEMINI_API_KEY:
+    # Fetch key fresh from environment (critical for Vercel updates)
+    api_key = os.getenv("GEMINI_API_KEY")
+    
+    if not api_key:
+        log.error("Gemini analysis skipped: GEMINI_API_KEY environment variable is empty.")
         return None
         
     try:
-        log.info("Sending audio to Gemini for master verification...")
+        log.info("Connecting to Gemini AI...")
+        genai.configure(api_key=api_key)
         model_gemini = genai.GenerativeModel("gemini-1.5-flash")
         
         # Upload file to Gemini
